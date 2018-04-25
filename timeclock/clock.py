@@ -1,8 +1,8 @@
 import sys
 from argparse import ArgumentParser
 
-import stamp
-from stamp import Transition, Stamp
+from timeclock import stamp
+from timeclock.stamp import Transition, Stamp
 
 
 def main():
@@ -18,13 +18,12 @@ def main():
 
     if this.may_follow(last):
         this.write('/tmp/stamps')
-    elif last is None:
-        print('First stamp must be an "in" transition', file=sys.stderr)
+        return 0
     else:
-        print('"{}" transition cannot follow "{}" transition'.format(this.transition, last.transition), file=sys.stderr)
+        if last is not None:
+            print('"{}" transition cannot follow "{}" transition'.format(this.transition, last.transition),
+                  file=sys.stderr)
+        else:
+            print('First stamp must be an "in" transition', file=sys.stderr)
+        return 1
 
-    return 0
-
-
-if __name__ == '__main__':
-    sys.exit(main())

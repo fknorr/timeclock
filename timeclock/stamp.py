@@ -1,8 +1,9 @@
-from os import path, listdir
+import re
 from enum import Enum, unique, auto
+from os import path, listdir
+
 import arrow
 from arrow import Arrow
-import re
 
 
 @unique

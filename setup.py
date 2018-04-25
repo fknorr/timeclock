@@ -1,17 +1,42 @@
+#!/usr/bin/env python3
+import os
+import re
+
 from setuptools import setup, find_packages
 
-setup(
-    name='timeclock',
-    version='0.1',
-    packages=find_packages(),
-    install_requires=[
-        'icalendar',
-        'toml',
-        'arrow'
-    ],
-    url='https://github.com/fknorr/timeclock',
-    license='MIT',
-    author='Fabian Knorr',
-    author_email='git@fabian-knorr.info',
-    description='Keep track of working hours with simple shell commands'
-)
+
+def main():
+    os.chdir(os.path.dirname(os.path.realpath(__file__)))
+
+    with open("timeclock/__init__.py", "r") as file:
+        version = re.search('^__version__\s*=\s*"(.*)"', file.read(), re.M).group(1)
+
+    with open("README", "rb") as f:
+        long_descr = f.read().decode("utf-8")
+
+    setup(
+        name='timeclock',
+        version=version,
+        packages=find_packages(),
+        install_requires=[
+            'icalendar',
+            'toml',
+            'arrow',
+        ],
+        entry_points={
+            'console_scripts': [
+                'clock = timeclock.clock:main',
+                'timesheet = timeclock.timesheet:main',
+            ],
+        },
+        long_description=long_descr,
+        url='https://github.com/fknorr/timeclock',
+        license='MIT',
+        author='Fabian Knorr',
+        author_email='git@fabian-knorr.info',
+        description='Keep track of working hours with simple shell commands',
+    )
+
+
+if __name__ == "__main__":
+    main()
