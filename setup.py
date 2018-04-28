@@ -8,11 +8,11 @@ from setuptools import setup, find_packages
 def main():
     os.chdir(os.path.dirname(os.path.realpath(__file__)))
 
-    with open("timeclock/__init__.py", "r") as file:
-        version = re.search('^__version__\s*=\s*"(.*)"', file.read(), re.M).group(1)
+    with open('timeclock/__init__.py', 'r') as file:
+        version = re.search(r"^__version__\s*=\s*'(.*)'", file.read(), re.M).group(1)
 
-    with open("README", "rb") as f:
-        long_descr = f.read().decode("utf-8")
+    with open('README', 'rb') as f:
+        long_descr = f.read().decode('utf-8')
 
     setup(
         name='timeclock',
@@ -22,6 +22,7 @@ def main():
             'icalendar',
             'toml',
             'arrow',
+            'appdirs',
         ],
         entry_points={
             'console_scripts': [

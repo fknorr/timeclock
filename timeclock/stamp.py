@@ -75,7 +75,7 @@ class Stamp:
         return 'Stamp({}, {}, {})'.format(repr(self.transition), repr(self.time), repr(self.details))
 
 
-def list_stamp_files(directory: str):
+def iter_stamps(directory: str):
     for entry in listdir(directory):
         full_name = path.join(directory, entry)
         if path.isfile(full_name) and Stamp.is_valid_file_name(full_name):
@@ -83,7 +83,7 @@ def list_stamp_files(directory: str):
 
 
 def most_recent(directory: str):
-    stamp_files = list(list_stamp_files(directory))
+    stamp_files = list(iter_stamps(directory))
     if stamp_files:
         return Stamp.load(max(stamp_files))
     return None
