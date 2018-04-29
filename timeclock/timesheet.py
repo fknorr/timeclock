@@ -25,6 +25,7 @@ def collect(stamps):
 
         if stamp.transition == Transition.OUT:
             yield day_intervals
+            day_intervals = []
 
         last_transition = stamp.transition
 
