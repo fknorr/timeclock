@@ -2,7 +2,6 @@ from argparse import ArgumentParser
 from os import path
 from datetime import timedelta
 
-import arrow
 from tabulate import tabulate
 
 from timeclock.config import Config
@@ -30,8 +29,8 @@ def collect(stamps):
         last_transition = stamp.transition
 
 
-def time_table(config: Config):
-    for day_intervals in collect(map(Stamp.load, sorted(iter_stamps(config.stamps['dir'])))):
+def time_table(stamp_dir: str):
+    for day_intervals in collect(map(Stamp.load, sorted(iter_stamps(stamp_dir)))):
         begin, end = day_intervals[0][0], day_intervals[-1][-1]
         work_time = sum((e - b for b, e in day_intervals), timedelta())
         pause = (end - begin) - work_time
@@ -50,7 +49,8 @@ def main():
     except FileNotFoundError:
         config = Config()
 
-    print(tabulate(time_table(config), headers=('date', 'begin', 'pause', 'end', 'time worked')))
+    stamp_dir = path.expanduser(config['stamps']['dir'])
+    print(tabulate(time_table(stamp_dir), headers=('date', 'begin', 'pause', 'end', 'time worked')))
 
     return 0
 

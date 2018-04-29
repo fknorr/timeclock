@@ -11,12 +11,11 @@ DEFAULT_CONFIG = {
 
 
 class Config(dict):
-    def __init__(self, **kwargs):
+    def __init__(self):
         super().__init__()
         self.__dict__.update(DEFAULT_CONFIG)
-        self.__dict__.update(kwargs)
 
     @classmethod
     def load(cls, file_name: str):
-        toml.load(file_name, cls)
+        return toml.load(file_name, cls)
 

@@ -28,7 +28,7 @@ def main():
     except FileNotFoundError:
         config = Config()
 
-    stamp_dir = path.expanduser(config.stamps['dir'])
+    stamp_dir = path.expanduser(config['stamps']['dir'])
     makedirs(stamp_dir, exist_ok=True)
 
     this = Stamp.now(args.transition, args.details)
