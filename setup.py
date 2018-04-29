@@ -23,6 +23,7 @@ def main():
             'toml',
             'arrow',
             'appdirs',
+            'tabulate',
         ],
         entry_points={
             'console_scripts': [
