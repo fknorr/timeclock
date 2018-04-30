@@ -36,10 +36,12 @@ def collect(stamps):
 def time_table(stamp_dir: str):
     for day_intervals in collect(map(Stamp.load, sorted(iter_stamps(stamp_dir)))):
         begin, end = day_intervals[0][0], day_intervals[-1][-1]
-        now = arrow.utcnow()
+        now = arrow.now()
         work_time = sum(((e if e is not None else now) - b for b, e in day_intervals), timedelta())
         pause = ((end if end is not None else now) - begin) - work_time
-        yield (begin.date(), begin.time(), pause, end.time() if end is not None else 'still working', work_time)
+        begin = begin.to('local')
+        end = end.to('local').time() if end is not None else 'still working'
+        yield (begin.date(), begin.time(), pause, end, work_time)
 
 
 def main():
