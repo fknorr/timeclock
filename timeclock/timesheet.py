@@ -3,10 +3,11 @@ from datetime import timedelta
 from os import path
 
 import appdirs
+import arrow
 from tabulate import tabulate
 
-from .stamp import iter_stamps, Stamp, Transition
 from . import config
+from .stamp import iter_stamps, Stamp, Transition
 
 
 def collect(stamps):
@@ -27,13 +28,18 @@ def collect(stamps):
 
         last_transition = stamp.transition
 
+    if last_transition.is_opening():
+        day_intervals.append((last_opening, None))
+        yield day_intervals
+
 
 def time_table(stamp_dir: str):
     for day_intervals in collect(map(Stamp.load, sorted(iter_stamps(stamp_dir)))):
         begin, end = day_intervals[0][0], day_intervals[-1][-1]
-        work_time = sum((e - b for b, e in day_intervals), timedelta())
-        pause = (end - begin) - work_time
-        yield (begin.date(), begin.time(), pause, end.time(), work_time)
+        now = arrow.utcnow()
+        work_time = sum(((e if e is not None else now) - b for b, e in day_intervals), timedelta())
+        pause = ((end if end is not None else now) - begin) - work_time
+        yield (begin.date(), begin.time(), pause, end.time() if end is not None else 'still working', work_time)
 
 
 def main():
