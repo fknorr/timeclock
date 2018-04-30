@@ -5,9 +5,9 @@ from argparse import ArgumentParser
 import arrow
 import appdirs
 
-from timeclock import stamp
-from timeclock.stamp import Transition, Stamp
-from timeclock.config import Config
+from . import stamp
+from .stamp import Transition, Stamp
+from . import config
 
 
 def main():
@@ -23,12 +23,9 @@ def main():
 
     args = parser.parse_args()
 
-    try:
-        config = Config.load(args.config)
-    except FileNotFoundError:
-        config = Config()
+    cfg = config.load(args.config)
 
-    stamp_dir = path.expanduser(config['stamps']['dir'])
+    stamp_dir = path.expanduser(cfg['stamps']['dir'])
     makedirs(stamp_dir, exist_ok=True)
 
     this = Stamp.now(args.transition, args.details)

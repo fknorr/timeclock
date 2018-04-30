@@ -1,5 +1,6 @@
 import toml
 import appdirs
+import os
 from os import path
 
 
@@ -10,12 +11,13 @@ DEFAULT_CONFIG = {
 }
 
 
-class Config(dict):
-    def __init__(self):
-        super().__init__()
-        self.__dict__.update(DEFAULT_CONFIG)
+def load(file_name: str):
+    cfg = DEFAULT_CONFIG.copy()
+    try:
+        cfg.update(toml.load(file_name))
+    except FileNotFoundError:
+        os.makedirs(path.dirname(file_name), exist_ok=True)
+        with open(file_name, 'w') as f:
+            toml.dump(cfg, f)
 
-    @classmethod
-    def load(cls, file_name: str):
-        return toml.load(file_name, cls)
-
+    return cfg

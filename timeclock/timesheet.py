@@ -1,13 +1,12 @@
 from argparse import ArgumentParser
-from os import path
 from datetime import timedelta
+from os import path
 
+import appdirs
 from tabulate import tabulate
 
-from timeclock.config import Config
-import appdirs
-
-from timeclock.stamp import iter_stamps, Stamp, Transition
+from .stamp import iter_stamps, Stamp, Transition
+from . import config
 
 
 def collect(stamps):
@@ -44,12 +43,9 @@ def main():
 
     args = parser.parse_args()
 
-    try:
-        config = Config.load(args.config)
-    except FileNotFoundError:
-        config = Config()
+    cfg = config.load(args.config)
 
-    stamp_dir = path.expanduser(config['stamps']['dir'])
+    stamp_dir = path.expanduser(cfg['stamps']['dir'])
     print(tabulate(time_table(stamp_dir), headers=('date', 'begin', 'pause', 'end', 'time worked')))
 
     return 0

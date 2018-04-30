@@ -28,6 +28,9 @@ class Transition(Enum):
         elif self == Transition.RESUME:
             return other in [Transition.PAUSE]
 
+    def is_opening(self):
+        return self == Transition.IN or self == Transition.RESUME
+
 
 class Stamp:
     FILE_NAME_RE = re.compile(r'^(\d+)\.stamp$')
