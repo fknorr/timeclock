@@ -29,6 +29,7 @@ def main():
             'console_scripts': [
                 'clock = timeclock.clock:main',
                 'timesheet = timeclock.timesheet:main',
+                'schedule = timeclock.schedule:main',
             ],
         },
         long_description=long_descr,
