@@ -78,10 +78,13 @@ class Schedule:
         self.hours_per_week = 40
         self.holidays = []
 
-        with open('/tmp/holidays.csv', 'r') as table:
-            reader = csv.reader(table, delimiter=';', quotechar='"', quoting=csv.QUOTE_MINIMAL)
-            for date, recurring, summary in reader:
-                self.holidays.append((arrow.get(date), recurring == 'True', summary))
+        try:
+            with open('/tmp/holidays.csv', 'r') as table:
+                reader = csv.reader(table, delimiter=';', quotechar='"', quoting=csv.QUOTE_MINIMAL)
+                for date, recurring, summary in reader:
+                    self.holidays.append((arrow.get(date), recurring == 'True', summary))
+        except FileNotFoundError:
+            pass
 
     def is_work_day(self, day: Arrow):
         day = day.floor('day')

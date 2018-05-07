@@ -4,10 +4,12 @@ from os import path
 
 import appdirs
 import arrow
+from arrow import Arrow
 from tabulate import tabulate
 
 from . import config
 from .stamp import iter_stamps, Stamp, Transition
+from .schedule import Schedule
 
 
 def collect(stamps):
@@ -33,10 +35,9 @@ def collect(stamps):
         yield day_intervals
 
 
-def time_table(stamp_dir: str):
-    for day_intervals in collect(map(Stamp.load, sorted(iter_stamps(stamp_dir)))):
+def time_table(days: list, now: Arrow):
+    for day_intervals in days:
         begin, end = day_intervals[0][0], day_intervals[-1][-1]
-        now = arrow.now()
         work_time = sum(((e if e is not None else now) - b for b, e in day_intervals), timedelta())
         pause = ((end if end is not None else now) - begin) - work_time
         begin = begin.to('local')
@@ -52,9 +53,34 @@ def main():
     args = parser.parse_args()
 
     cfg = config.load(args.config)
+    now = arrow.now()
 
     stamp_dir = path.expanduser(cfg['stamps']['dir'])
-    print(tabulate(time_table(stamp_dir), headers=('date', 'begin', 'pause', 'end', 'time worked')))
+    days = list(collect(map(Stamp.load, sorted(iter_stamps(stamp_dir)))))
+
+    print(tabulate(time_table(days, now), headers=('date', 'begin', 'pause', 'end', 'time worked')))
+
+    work_time = timedelta()
+
+    if days:
+        current_week = days[-1][0][0].floor('week')
+        for day_intervals in reversed(days):
+            if day_intervals[0][0].floor('week') != current_week:
+                break
+
+            work_time += sum(((e if e is not None else now) - b for b, e in day_intervals), timedelta())
+
+    schedule = Schedule()
+
+    hours_required = timedelta(hours=schedule.hours_per_week)
+    print('\nWorked {} of {} required ({:.0f}%)'.format(work_time, hours_required, 100 * work_time / hours_required))
+
+    if work_time < hours_required:
+        print('{} to go.'.format(hours_required - work_time))
+    elif work_time > hours_required:
+        print('Made {} overtime.'.format(work_time - hours_required))
+    else:
+        print('Just on time!')
 
     return 0
 
