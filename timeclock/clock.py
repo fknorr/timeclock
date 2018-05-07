@@ -12,13 +12,12 @@ from . import config
 
 def main():
     parser = ArgumentParser(description='Keep track of working hours')
-    parser.add_argument('transition', metavar='transition', type=Transition.from_str,
+    parser.add_argument('transition', type=Transition.from_str,
                         help='Type of transition ' + '|'.join(map(str, Transition)))
-    parser.add_argument('details', metavar='details', type=str, nargs='?', default='')
+    parser.add_argument('details', type=str, nargs='?', default='')
     parser.add_argument('-f', '--force', help='Allow out-of-order transitions')
-    parser.add_argument('-t', '--at', metavar='time', type=arrow.get, default=arrow.utcnow(),
-                        help='Time of transition (default now)')
-    parser.add_argument('-c', '--config', metavar='config', type=str,
+    parser.add_argument('-t', '--at', type=arrow.get, default=arrow.utcnow(), help='Time of transition (default now)')
+    parser.add_argument('-c', '--config', type=str,
                         default=path.join(appdirs.user_config_dir('timeclock', roaming=True), 'config.toml'))
 
     args = parser.parse_args()
@@ -28,7 +27,7 @@ def main():
     stamp_dir = path.expanduser(cfg['stamps']['dir'])
     makedirs(stamp_dir, exist_ok=True)
 
-    this = Stamp.now(args.transition, args.details)
+    this = Stamp(args.transition, args.at, args.details)
     last = stamp.most_recent(stamp_dir)
 
     if this.may_follow(last):
