@@ -12,6 +12,7 @@ class Transition(Enum):
     OUT = auto()
     PAUSE = auto()
     RESUME = auto()
+    TAG = auto()
 
     def __str__(self):
         return self.name.lower()
@@ -27,9 +28,11 @@ class Transition(Enum):
             return other in [Transition.IN, Transition.RESUME]
         elif self == Transition.RESUME:
             return other in [Transition.PAUSE]
+        elif self == Transition.TAG:
+            return other not in [Transition.OUT, None]
 
     def is_opening(self):
-        return self == Transition.IN or self == Transition.RESUME
+        return self in [Transition.IN, Transition.RESUME, Transition.TAG]
 
 
 class Stamp:

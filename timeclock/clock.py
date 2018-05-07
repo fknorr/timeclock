@@ -15,7 +15,7 @@ def main():
     parser.add_argument('transition', type=Transition.from_str,
                         help='Type of transition ' + '|'.join(map(str, Transition)))
     parser.add_argument('details', type=str, nargs='?', default='')
-    parser.add_argument('-f', '--force', help='Allow out-of-order transitions')
+    parser.add_argument('-f', '--force', default=False, action='store_true', help='Allow out-of-order transitions')
     parser.add_argument('-t', '--at', type=arrow.get, default=arrow.utcnow(), help='Time of transition (default now)')
     parser.add_argument('-c', '--config', type=str,
                         default=path.join(appdirs.user_config_dir('timeclock', roaming=True), 'config.toml'))
@@ -41,3 +41,6 @@ def main():
             print('First stamp must be an "in" transition', file=sys.stderr)
         return 1
 
+
+if __name__ == '__main__':
+    main()
