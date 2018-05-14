@@ -1,3 +1,4 @@
+import re
 from argparse import ArgumentParser
 from datetime import timedelta
 from math import floor
@@ -38,26 +39,39 @@ def collect(stamps):
         yield day_intervals
 
 
-def time_table(days: list, now: Arrow):
-    for day_intervals in days:
-        begin, end = day_intervals[0][0], day_intervals[-1][-1]
-        work_time = sum(((e if e is not None else now) - b for b, e in day_intervals), timedelta())
-        pause = ((end if end is not None else now) - begin) - work_time
-        begin = begin.to('local')
-        end = end.to('local').time() if end is not None else 'still working'
-        yield (begin.date(), begin.time(), str(pause) + ' h', end, str(work_time) + ' h')
-
-
 def fmt_hours(hours: float):
     h = floor(hours)
     m = floor(60 * (hours - h))
-    return '{:02d}:{:02d}'.format(int(h), int(m))
+    return '{:02d}:{:02d} h'.format(int(h), int(m))
+
+
+def fmt_timedelta(delta: timedelta):
+    return fmt_hours(delta.total_seconds() / 3600)
+
+
+def time_table(days: list, now: Arrow):
+    last_week = None
+    for day_intervals in days:
+        begin, end = day_intervals[0][0], day_intervals[-1][-1]
+
+        this_week = begin.floor('week')
+        if last_week is not None and last_week < this_week:
+            yield ['---'] * 5
+        last_week = this_week
+
+        work_time = sum(((e if e is not None else now) - b for b, e in day_intervals), timedelta())
+        pause = ((end if end is not None else now) - begin) - work_time
+        begin = begin.to('local')
+        end_text = end.to('local').format('HH:mm') if end is not None else 'still working'
+        yield [begin.format('ddd MMM DD'), begin.format('hh:mm'), end_text,
+               fmt_timedelta(pause), fmt_timedelta(work_time)]
 
 
 def main():
     parser = ArgumentParser(description='Keep track of working hours')
     parser.add_argument('-c', '--config', metavar='config', type=str,
-                        default=path.join(appdirs.user_config_dir('timeclock', roaming=True), 'config.toml'))
+                        default=path.join(appdirs.user_config_dir('timeclock', roaming=True),
+                                          'config.toml'))
 
     args = parser.parse_args()
 
@@ -68,8 +82,13 @@ def main():
     stamps = [Stamp.load(s) for s in sorted(iter_stamps(stamp_dir))]
 
     days = list(collect(stamps))
-    table = tabulate(time_table(days, now), disable_numparse=True, stralign='right',
-                     headers=('date', 'begin', 'pause', 'end', 'time worked'))
+    table = tabulate(time_table(days, now), disable_numparse=True, stralign='center',
+                     tablefmt='orgtbl', headers=('date', 'begin', 'end', 'pause', 'worked'))
+    rows = table.splitlines()
+    line = '-' * (len(rows[0]) - 2)
+    rows = [rows[1] if ' --- ' in r else r for r in rows]
+    table = '\n'.join(['.' + line + '.'] + rows + ["'" + line + "'"])
+
     if stamps[-1].transition == Transition.PAUSE:
         table += ' (paused)'
     print(table)
