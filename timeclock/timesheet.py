@@ -63,7 +63,7 @@ def time_table(days: list, now: Arrow):
         pause = ((end if end is not None else now) - begin) - work_time
         begin = begin.to('local')
         end_text = end.to('local').format('HH:mm') if end is not None else 'still working'
-        yield [begin.format('ddd MMM DD'), begin.format('hh:mm'), end_text,
+        yield [begin.format('ddd MMM DD'), begin.format('HH:mm'), end_text,
                fmt_timedelta(pause), fmt_timedelta(work_time)]
 
 
