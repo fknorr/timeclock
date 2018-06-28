@@ -9,9 +9,9 @@ import arrow
 from arrow import Arrow
 from tabulate import tabulate
 
-from . import config
-from .stamp import iter_stamps, Stamp, Transition
-from .schedule import Schedule
+from timeclock import config
+from timeclock.stamp import iter_stamps, Stamp, Transition
+from timeclock.schedule import Schedule
 
 
 def collect(stamps):

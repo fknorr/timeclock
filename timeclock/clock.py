@@ -1,20 +1,19 @@
 import sys
 from os import path, makedirs
 import argparse
-import dateparser
 
 import arrow
 import appdirs
 
-from . import stamp
-from .stamp import Transition, Stamp
-from . import config
+from timeclock import stamp
+from timeclock.stamp import Transition, Stamp
+from timeclock import config
 
 
 class ArgumentParser(argparse.ArgumentParser):
     def __init__(self):
         super().__init__(description='Keep track of working hours')
-        self.add_argument('transition', type=Transition.from_str,
+        self.add_argument('transition', type=self._parse_transition,
                             help='Type of transition ' + '|'.join(map(str, Transition)))
         self.add_argument('details', type=str, nargs='?', default='')
         self.add_argument('-f', '--force', default=False, action='store_true', help='Allow out-of-order transitions')
@@ -23,8 +22,16 @@ class ArgumentParser(argparse.ArgumentParser):
         self.add_argument('-c', '--config', type=str,
                             default=path.join(appdirs.user_config_dir('timeclock', roaming=True), 'config.toml'))
 
+    def _parse_transition(self, transition: str):
+        try:
+            return Transition.from_str(transition)
+        except KeyError:
+            self.error('Unknown transition {}. Allowed values are {}'.format(
+                transition, ' '.join('"{}"'.format(t) for t in Transition)))
+
     def _parse_date(self, date: str):
-        dt = dateparser.parse(date)
+        import dateparser
+        dt = dateparser.parse(date, languages=['en'])
         if dt is None:
             self.error('Invalid date format "{}". Try something like "11:40" or "2 hours ago"'.format(date))
         return arrow.Arrow.fromdatetime(dt)
