@@ -24,6 +24,7 @@ def main():
             'arrow',
             'appdirs',
             'tabulate',
+            'dateparser',
         ],
         entry_points={
             'console_scripts': [
