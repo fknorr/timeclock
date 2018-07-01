@@ -14,31 +14,6 @@ from timeclock.stamp import iter_stamps, Stamp, Transition
 from timeclock.schedule import Schedule
 
 
-def collect(stamps):
-    last_opening = None
-    day_intervals = []
-    last_transition = None
-    for stamp in stamps:
-        assert stamp.transition.may_follow(last_transition)
-
-        if stamp.transition in [Transition.IN, Transition.RESUME]:
-            last_opening = stamp.time
-        else:
-            day_intervals.append((last_opening, stamp.time))
-
-        if stamp.transition == Transition.OUT:
-            yield day_intervals
-            day_intervals = []
-
-        last_transition = stamp.transition
-
-    if last_transition.is_opening():
-        day_intervals.append((last_opening, None))
-
-    if day_intervals:
-        yield day_intervals
-
-
 def fmt_hours(hours: float):
     h = floor(hours)
     m = floor(60 * (hours - h))
@@ -49,28 +24,93 @@ def fmt_timedelta(delta: timedelta):
     return fmt_hours(delta.total_seconds() / 3600)
 
 
-def time_table(days: list, now: Arrow):
+class WorkDay:
+    def __init__(self):
+        self.begin = None
+        self.end = None
+        self.pause_time = timedelta()
+        self.tags = []
+        self.invalid_transitions = False
+
+    @property
+    def work_time(self):
+        if self.begin and self.end:
+            return (self.end - self.begin) - self.pause_time
+        else:
+            return timedelta()
+
+    def consistent(self):
+        return self.begin is not None and not self.invalid_transitions
+
+    def complete(self):
+        return self.consistent() and self.end is not None
+
+    def columns(self):
+        cols = []
+
+        def col_if(condition: bool, fmt):
+            cols.append(fmt() if condition else '')
+
+        col_if(self.begin, lambda: self.begin.format('ddd MMM DD'))
+        col_if(self.begin, lambda: self.begin.format('HH:mm'))
+        col_if(self.end, lambda: self.end.format('HH:mm'))
+        cols.append(fmt_timedelta(self.pause_time))
+        col_if(self.begin and self.end, lambda: fmt_timedelta(self.work_time))
+
+        return cols
+
+
+def collect(stamps):
+    day = None
+    paused = None
+    last_stamp = None
+    for stamp in stamps:
+        if day is None or stamp.transition == Transition.IN:
+            if day is not None:
+                day.invalid_transitions = True
+                yield day
+            day = WorkDay()
+
+        if stamp.transition != Transition.IN and not stamp.may_follow(last_stamp):
+            day.invalid_transitions = True
+
+        if stamp.transition == Transition.IN:
+            day.begin = stamp.time
+        elif stamp.transition == Transition.OUT:
+            day.end = stamp.time
+        elif stamp.transition == Transition.PAUSE:
+            paused = stamp.time
+        elif stamp.transition == Transition.RESUME:
+            if paused is not None:
+                day.pause_time += stamp.time - paused
+                paused = None
+
+        if day is not None and stamp.details:
+            day.tags.append(stamp.details)
+
+        if stamp.transition == Transition.OUT:
+            yield day
+            day = None
+        if stamp.transition != Transition.PAUSE:
+            paused = None
+        last_stamp = stamp
+
+
+def time_table(work_days: list):
     last_week = None
     week_work_time = timedelta()
 
-    for day_intervals in days:
-        begin, end = day_intervals[0][0], day_intervals[-1][-1]
-
-        this_week = begin.floor('week')
+    for day in work_days:
+        this_week = day.begin.floor('week')
         if last_week is not None and last_week < this_week:
             yield ['---'] * 5
             yield ['week total', '', '', '', fmt_timedelta(week_work_time)]
             yield ['---'] * 5
             week_work_time = timedelta()
         last_week = this_week
+        week_work_time += day.work_time
 
-        work_time = sum(((e if e is not None else now) - b for b, e in day_intervals), timedelta())
-        week_work_time += work_time
-        pause = ((end if end is not None else now) - begin) - work_time
-        begin = begin.to('local')
-        end_text = end.to('local').format('HH:mm') if end is not None else 'still working'
-        yield [begin.format('ddd MMM DD'), begin.format('HH:mm'), end_text,
-               fmt_timedelta(pause), fmt_timedelta(work_time)]
+        yield day.columns()
 
     yield ['---'] * 5
     yield ['week total', '', '', '', fmt_timedelta(week_work_time)]
@@ -90,8 +130,8 @@ def main():
     stamp_dir = path.expanduser(cfg['stamps']['dir'])
     stamps = [Stamp.load(s) for s in sorted(iter_stamps(stamp_dir))]
 
-    days = list(collect(stamps))
-    table = tabulate(time_table(days, now), disable_numparse=True, stralign='center',
+    work_days = list(collect(stamps))
+    table = tabulate(time_table(work_days, now), disable_numparse=True, stralign='center',
                      tablefmt='orgtbl', headers=('date', 'begin', 'end', 'pause', 'worked'))
     rows = table.splitlines()
     line = '-' * (len(rows[0]) - 2)
@@ -103,15 +143,17 @@ def main():
     print(table)
 
     work_time = timedelta()
+    inconsistent = False
 
-    if days:
+    if work_days:
         current_week = now.floor('week')
-        for day_intervals in reversed(days):
-            if day_intervals[0][0].floor('week') != current_week:
+        for day in reversed(work_days):
+            if day.begin is not None and day.begin.floor('week') != current_week:
                 break
+            if not day.consistent():
+                inconsistent = True
 
-            work_time += sum(((e if e is not None else now) - b for b, e in day_intervals),
-                             timedelta())
+            work_time += day.work_time
 
     schedule = Schedule()
 
@@ -127,6 +169,9 @@ def main():
         print('Made {} overtime this week.'.format(fmt_hours(work_time - hours_required)))
     else:
         print('Just on time!')
+
+    if inconsistent:
+        print('The timesheet for this week is inconsistent. Maybe the file system is out of sync?')
 
     return 0
 

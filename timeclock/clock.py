@@ -47,7 +47,7 @@ def main():
     this = Stamp(args.transition, args.at, args.details)
     last = stamp.most_recent(stamp_dir)
 
-    if this.may_follow(last):
+    if args.force or this.may_follow(last):
         this.write(stamp_dir)
         return 0
     else:
