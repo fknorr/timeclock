@@ -23,7 +23,6 @@ def main():
             'toml',
             'arrow',
             'appdirs',
-            'tabulate',
             'dateparser',
         ],
         entry_points={

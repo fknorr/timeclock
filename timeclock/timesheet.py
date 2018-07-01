@@ -1,13 +1,12 @@
-import re
 from argparse import ArgumentParser
 from datetime import timedelta
+from enum import Enum, unique
 from math import floor
 from os import path
 
 import appdirs
 import arrow
 from arrow import Arrow
-from tabulate import tabulate
 
 from timeclock import config
 from timeclock.stamp import iter_stamps, Stamp, Transition
@@ -24,6 +23,13 @@ def fmt_timedelta(delta: timedelta):
     return fmt_hours(delta.total_seconds() / 3600)
 
 
+@unique
+class State(Enum):
+    ABSENT = 0
+    WORKING = 1
+    PAUSING = 2
+
+
 class WorkDay:
     def __init__(self):
         self.begin = None
@@ -31,6 +37,7 @@ class WorkDay:
         self.pause_time = timedelta()
         self.tags = []
         self.invalid_transitions = False
+        self.state = None
 
     @property
     def work_time(self):
@@ -43,7 +50,7 @@ class WorkDay:
         return self.begin is not None and not self.invalid_transitions
 
     def complete(self):
-        return self.consistent() and self.end is not None
+        return self.consistent() and self.end is not None and self.state == State.ABSENT
 
     def columns(self):
         cols = []
@@ -76,14 +83,18 @@ def collect(stamps):
 
         if stamp.transition == Transition.IN:
             day.begin = stamp.time
+            day.state = State.WORKING
         elif stamp.transition == Transition.OUT:
             day.end = stamp.time
+            day.state = State.ABSENT
         elif stamp.transition == Transition.PAUSE:
             paused = stamp.time
+            day.state = State.PAUSING
         elif stamp.transition == Transition.RESUME:
             if paused is not None:
                 day.pause_time += stamp.time - paused
                 paused = None
+            day.state = State.WORKING
 
         if day is not None and stamp.details:
             day.tags.append(stamp.details)
@@ -96,24 +107,47 @@ def collect(stamps):
         last_stamp = stamp
 
 
-def time_table(work_days: list):
+def pad_center(text, width):
+    pad = width - len(text)
+    pad_left = pad // 2
+    return ' ' * pad_left + text + ' ' * (pad - pad_left)
+
+
+def time_table(work_days: list, now: Arrow):
+    head = ['date', 'begin', 'end', 'pause', 'worked']
+    cells = [d.columns() for d in work_days]
+    column_widths = [max(map(len, c)) for c in zip(*([head] + cells))]
+
+    def make_rule(outer_sep: str, inner_sep: str):
+        return '-'.join([outer_sep, ('-' + inner_sep + '-').join(w * '-' for w in column_widths), outer_sep])
+
+    rule = make_rule('|', '+')
+
+    def print_row(cells: [str]):
+        print('|', ' | '.join(pad_center(*a) for a in zip(cells, column_widths)), '|')
+
+    print(make_rule('.', '-'))
+    print_row(head)
+    print(rule)
+
     last_week = None
     week_work_time = timedelta()
 
-    for day in work_days:
+    for day, row in zip(work_days, cells):
         this_week = day.begin.floor('week')
         if last_week is not None and last_week < this_week:
-            yield ['---'] * 5
-            yield ['week total', '', '', '', fmt_timedelta(week_work_time)]
-            yield ['---'] * 5
+            print(rule)
+            print_row(['week total', '', '', '', fmt_timedelta(week_work_time)])
+            print(rule)
             week_work_time = timedelta()
         last_week = this_week
         week_work_time += day.work_time
 
-        yield day.columns()
+        print_row(row)
 
-    yield ['---'] * 5
-    yield ['week total', '', '', '', fmt_timedelta(week_work_time)]
+    print(rule)
+    print_row(['week total', '', '', '', fmt_timedelta(week_work_time)])
+    print(make_rule("'", '-'))
 
 
 def main():
@@ -131,16 +165,10 @@ def main():
     stamps = [Stamp.load(s) for s in sorted(iter_stamps(stamp_dir))]
 
     work_days = list(collect(stamps))
-    table = tabulate(time_table(work_days, now), disable_numparse=True, stralign='center',
-                     tablefmt='orgtbl', headers=('date', 'begin', 'end', 'pause', 'worked'))
-    rows = table.splitlines()
-    line = '-' * (len(rows[0]) - 2)
-    rows = [rows[1] if ' --- ' in r else r for r in rows]
-    table = '\n'.join(['.' + line + '.'] + rows + ["'" + line + "'"])
+    time_table(work_days, now)
 
     if stamps[-1].transition == Transition.PAUSE:
-        table += ' (paused)'
-    print(table)
+        print('paused')
 
     work_time = timedelta()
     inconsistent = False
