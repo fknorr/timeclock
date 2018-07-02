@@ -56,7 +56,13 @@ class WorkDay:
         cols = []
 
         def col_if(condition: bool, fmt):
-            cols.append(fmt() if condition else '')
+            if condition:
+                string = fmt()
+            elif not self.consistent():
+                string = '-?-'
+            else:
+                string = ''
+            cols.append(string)
 
         col_if(self.begin, lambda: self.begin.format('ddd MMM DD'))
         col_if(self.begin, lambda: self.begin.format('HH:mm'))
@@ -67,7 +73,7 @@ class WorkDay:
         return cols
 
 
-def collect(stamps):
+def collect(stamps, now: Arrow):
     day = None
     paused = None
     last_stamp = None
@@ -106,6 +112,11 @@ def collect(stamps):
             paused = None
         last_stamp = stamp
 
+    if day is not None:
+        assert day.end is None
+        day.end = now
+        yield day
+
 
 def pad_center(text, width):
     pad = width - len(text)
@@ -123,8 +134,9 @@ def time_table(work_days: list, now: Arrow):
 
     rule = make_rule('|', '+')
 
-    def print_row(cells: [str]):
-        print('|', ' | '.join(pad_center(*a) for a in zip(cells, column_widths)), '|')
+    def print_row(cells: [str], note: str or None=None):
+        tail = [note] if note is not None else []
+        print('|', ' | '.join(pad_center(*a) for a in zip(cells, column_widths)), '|', *tail)
 
     print(make_rule('.', '-'))
     print_row(head)
@@ -143,7 +155,13 @@ def time_table(work_days: list, now: Arrow):
         last_week = this_week
         week_work_time += day.work_time
 
-        print_row(row)
+        note = None
+        if day.consistent():
+            if day.state == State.PAUSING:
+                note = '(paused)'
+            elif day.state == State.WORKING:
+                note = '(still working)'
+        print_row(row, note)
 
     print(rule)
     print_row(['week total', '', '', '', fmt_timedelta(week_work_time)])
@@ -164,22 +182,15 @@ def main():
     stamp_dir = path.expanduser(cfg['stamps']['dir'])
     stamps = [Stamp.load(s) for s in sorted(iter_stamps(stamp_dir))]
 
-    work_days = list(collect(stamps))
+    work_days = list(collect(stamps, now))
     time_table(work_days, now)
 
-    if stamps[-1].transition == Transition.PAUSE:
-        print('paused')
-
     work_time = timedelta()
-    inconsistent = False
-
     if work_days:
         current_week = now.floor('week')
         for day in reversed(work_days):
             if day.begin is not None and day.begin.floor('week') != current_week:
                 break
-            if not day.consistent():
-                inconsistent = True
 
             work_time += day.work_time
 
@@ -198,8 +209,8 @@ def main():
     else:
         print('Just on time!')
 
-    if inconsistent:
-        print('The timesheet for this week is inconsistent. Maybe the file system is out of sync?')
+    if any(not d.consistent() for d in work_days):
+        print('The timesheet is inconsistent. Maybe the file system is out of sync?')
 
     return 0
 
