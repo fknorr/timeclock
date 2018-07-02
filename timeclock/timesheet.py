@@ -173,6 +173,7 @@ def main():
     parser.add_argument('-c', '--config', metavar='config', type=str,
                         default=path.join(appdirs.user_config_dir('timeclock', roaming=True),
                                           'config.toml'))
+    parser.add_argument('-n', '--weeks', type=int, default=1)
 
     args = parser.parse_args()
 
@@ -180,9 +181,19 @@ def main():
     now = arrow.utcnow()
 
     stamp_dir = path.expanduser(cfg['stamps']['dir'])
-    stamps = [Stamp.load(s) for s in sorted(iter_stamps(stamp_dir))]
+    stamps = []
+    week = 0
+    current_week = now.floor('week')
+    for file in sorted(iter_stamps(stamp_dir), reverse=True):
+        st = Stamp.load(file)
+        if st.time.floor('week') != current_week:
+            week += 1
+            if week >= args.weeks:
+                break
+            current_week = st.time.floor('week')
+        stamps.append(st)
 
-    work_days = list(collect(stamps, now))
+    work_days = list(collect(reversed(stamps), now))
     time_table(work_days, now)
 
     work_time = timedelta()
