@@ -1,6 +1,6 @@
 import re
 from enum import Enum, unique, auto
-from os import path, listdir
+from os import path, listdir, remove
 
 import arrow
 from arrow import Arrow
@@ -94,3 +94,6 @@ def most_recent(directory: str):
         return Stamp.load(max(stamp_files))
     return None
 
+
+def remove_at(directory: str, time: Arrow):
+    remove(path.join(directory, '{}.stamp'.format(time.timestamp)))
