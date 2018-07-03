@@ -63,9 +63,9 @@ class WorkDay:
                 string = ''
             cols.append(string)
 
-        col_if(self.begin, lambda: self.begin.format('ddd MMM DD'))
-        col_if(self.begin, lambda: self.begin.format('HH:mm'))
-        col_if(self.end, lambda: self.end.format('HH:mm'))
+        col_if(self.begin, lambda: self.begin.to('local').format('ddd MMM DD'))
+        col_if(self.begin, lambda: self.begin.to('local').format('HH:mm'))
+        col_if(self.end, lambda: self.end.to('local').format('HH:mm'))
         cols.append(fmt_timedelta(self.pause_time))
         col_if(self.consistent(), lambda: fmt_timedelta(self.work_time(now)))
 
