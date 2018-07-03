@@ -39,12 +39,11 @@ class WorkDay:
         self.invalid_transitions = False
         self.state = None
 
-    @property
-    def work_time(self):
-        if self.begin and self.end:
-            return (self.end - self.begin) - self.pause_time
-        else:
+    def work_time(self, now: Arrow):
+        if not self.begin:
             return timedelta()
+        end = self.end if self.end is not None else now
+        return (end - self.begin) - self.pause_time
 
     def consistent(self):
         return self.begin is not None and not self.invalid_transitions
@@ -52,7 +51,7 @@ class WorkDay:
     def complete(self):
         return self.consistent() and self.end is not None and self.state == State.ABSENT
 
-    def columns(self):
+    def columns(self, now: Arrow):
         cols = []
 
         def col_if(condition: bool, fmt):
@@ -68,7 +67,7 @@ class WorkDay:
         col_if(self.begin, lambda: self.begin.format('HH:mm'))
         col_if(self.end, lambda: self.end.format('HH:mm'))
         cols.append(fmt_timedelta(self.pause_time))
-        col_if(self.begin and self.end, lambda: fmt_timedelta(self.work_time))
+        col_if(self.consistent(), lambda: fmt_timedelta(self.work_time(now)))
 
         return cols
 
@@ -114,7 +113,8 @@ def collect(stamps, now: Arrow):
 
     if day is not None:
         assert day.end is None
-        day.end = now
+        if paused is not None:
+            day.pause_time += now - paused
         yield day
 
 
@@ -126,11 +126,12 @@ def pad_center(text, width):
 
 def time_table(work_days: list, now: Arrow):
     head = ['date', 'begin', 'end', 'pause', 'worked']
-    cells = [d.columns() for d in work_days]
+    cells = [d.columns(now) for d in work_days]
     column_widths = [max(map(len, c)) for c in zip(*([head] + cells))]
 
     def make_rule(outer_sep: str, inner_sep: str):
-        return '-'.join([outer_sep, ('-' + inner_sep + '-').join(w * '-' for w in column_widths), outer_sep])
+        return '-'.join([outer_sep, ('-' + inner_sep + '-').join(w * '-' for w in column_widths),
+                         outer_sep])
 
     rule = make_rule('|', '+')
 
@@ -153,7 +154,7 @@ def time_table(work_days: list, now: Arrow):
             print(rule)
             week_work_time = timedelta()
         last_week = this_week
-        week_work_time += day.work_time
+        week_work_time += day.work_time(now)
 
         note = None
         if day.consistent():
@@ -203,7 +204,7 @@ def main():
             if day.begin is not None and day.begin.floor('week') != current_week:
                 break
 
-            work_time += day.work_time
+            work_time += day.work_time(now)
 
     schedule = Schedule()
 
