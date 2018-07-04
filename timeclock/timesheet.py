@@ -27,6 +27,8 @@ ascii_table = {
     'inner-vertical': '|',
     'outer-horizontal': '-',
     'outer-vertical': '|',
+    'working-state': '>>',
+    'paused-state': '::',
 }
 
 
@@ -44,6 +46,8 @@ box_table = {
     'inner-vertical': '\u2502',
     'outer-horizontal': '\u2500',
     'outer-vertical': '\u2502',
+    'working-state': '\u25b6',
+    'paused-state': '\u23f8',
 }
 
 
@@ -85,23 +89,31 @@ class WorkDay:
     def complete(self):
         return self.consistent() and self.end is not None and self.state == State.ABSENT
 
-    def columns(self, now: Arrow):
+    def columns(self, now: Arrow, table: dict):
         cols = []
+        placeholder = '-?-'
 
-        def col_if(condition: bool, fmt):
-            if condition:
-                string = fmt()
-            elif not self.consistent():
-                string = '-?-'
-            else:
-                string = ''
-            cols.append(string)
+        if self.begin:
+            begin_time = self.begin.to('local')
+            cols += [begin_time.format('ddd MMM DD'), begin_time.format('HH:mm')]
+        else:
+            cols += [placeholder, placeholder]
 
-        col_if(self.begin, lambda: self.begin.to('local').format('ddd MMM DD'))
-        col_if(self.begin, lambda: self.begin.to('local').format('HH:mm'))
-        col_if(self.end, lambda: self.end.to('local').format('HH:mm'))
+        if self.end:
+            cols.append(self.end.to('local').format('HH:mm'))
+        elif self.state == State.PAUSING:
+            cols.append(table['paused-state'])
+        elif self.state == State.WORKING:
+            cols.append(table['working-state'])
+        else:
+            cols.append(placeholder)
+
         cols.append(fmt_timedelta(self.pause_time))
-        col_if(self.consistent(), lambda: fmt_timedelta(self.work_time(now)))
+
+        if self.consistent():
+            cols.append(fmt_timedelta(self.work_time(now)))
+        else:
+            cols.append(placeholder)
 
         return cols
 
@@ -160,7 +172,7 @@ def pad_center(text, width):
 
 def time_table(work_days: list, now: Arrow, table: dict):
     head = ['date', 'begin', 'end', 'pause', 'worked']
-    cells = [d.columns(now) for d in work_days]
+    cells = [d.columns(now, table) for d in work_days]
     column_widths = [max(map(len, c)) for c in zip(*([head] + cells))]
 
     def make_rule(left: str, dash: str, inner: str, right: str):
@@ -169,12 +181,11 @@ def time_table(work_days: list, now: Arrow, table: dict):
     rule = make_rule(table['join-left'], table['inner-horizontal'], table['join-mid'],
                      table['join-right'])
 
-    def print_row(cells: [str], note: str or None=None):
-        tail = [note] if note is not None else []
+    def print_row(cells: [str]):
         inner = table['inner-vertical']
         outer = table['outer-vertical']
         print(outer, (' ' + inner + ' ').join(pad_center(*a) for a in zip(cells, column_widths)),
-                    outer, *tail)
+                    outer)
 
     print(make_rule(table['corner-top-left'], table['outer-horizontal'], table['join-top'],
                     table['corner-top-right']))
@@ -193,14 +204,7 @@ def time_table(work_days: list, now: Arrow, table: dict):
             week_work_time = timedelta()
         last_week = this_week
         week_work_time += day.work_time(now)
-
-        note = None
-        if day.consistent():
-            if day.state == State.PAUSING:
-                note = '(paused)'
-            elif day.state == State.WORKING:
-                note = '(still working)'
-        print_row(row, note)
+        print_row(row)
 
     print(rule)
     print_row(['week total', '', '', '', fmt_timedelta(week_work_time)])
