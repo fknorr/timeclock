@@ -13,6 +13,40 @@ from timeclock.stamp import iter_stamps, Stamp, Transition
 from timeclock.schedule import Schedule
 
 
+ascii_table = {
+    'corner-top-left': '.',
+    'corner-top-right': '.',
+    'corner-bottom-left': "'",
+    'corner-bottom-right': "'",
+    'join-mid': '+',
+    'join-top': '-',
+    'join-bottom': '-',
+    'join-left': '|',
+    'join-right': '|',
+    'inner-horizontal': '-',
+    'inner-vertical': '|',
+    'outer-horizontal': '-',
+    'outer-vertical': '|',
+}
+
+
+box_table = {
+    'corner-top-left': '\u250c',
+    'corner-top-right': '\u2510',
+    'corner-bottom-left': '\u2514',
+    'corner-bottom-right': '\u2518',
+    'join-mid': '\u253c',
+    'join-top': '\u252c',
+    'join-bottom': '\u2534',
+    'join-left': '\u251c',
+    'join-right': '\u2524',
+    'inner-horizontal': '\u2500',
+    'inner-vertical': '\u2502',
+    'outer-horizontal': '\u2500',
+    'outer-vertical': '\u2502',
+}
+
+
 def fmt_hours(hours: float):
     h = floor(hours)
     m = floor(60 * (hours - h))
@@ -124,22 +158,26 @@ def pad_center(text, width):
     return ' ' * pad_left + text + ' ' * (pad - pad_left)
 
 
-def time_table(work_days: list, now: Arrow):
+def time_table(work_days: list, now: Arrow, table: dict):
     head = ['date', 'begin', 'end', 'pause', 'worked']
     cells = [d.columns(now) for d in work_days]
     column_widths = [max(map(len, c)) for c in zip(*([head] + cells))]
 
-    def make_rule(outer_sep: str, inner_sep: str):
-        return '-'.join([outer_sep, ('-' + inner_sep + '-').join(w * '-' for w in column_widths),
-                         outer_sep])
+    def make_rule(left: str, dash: str, inner: str, right: str):
+        return dash.join([left, (dash + inner + dash).join(w * dash for w in column_widths), right])
 
-    rule = make_rule('|', '+')
+    rule = make_rule(table['join-left'], table['inner-horizontal'], table['join-mid'],
+                     table['join-right'])
 
     def print_row(cells: [str], note: str or None=None):
         tail = [note] if note is not None else []
-        print('|', ' | '.join(pad_center(*a) for a in zip(cells, column_widths)), '|', *tail)
+        inner = table['inner-vertical']
+        outer = table['outer-vertical']
+        print(outer, (' ' + inner + ' ').join(pad_center(*a) for a in zip(cells, column_widths)),
+                    outer, *tail)
 
-    print(make_rule('.', '-'))
+    print(make_rule(table['corner-top-left'], table['outer-horizontal'], table['join-top'],
+                    table['corner-top-right']))
     print_row(head)
     print(rule)
 
@@ -166,7 +204,8 @@ def time_table(work_days: list, now: Arrow):
 
     print(rule)
     print_row(['week total', '', '', '', fmt_timedelta(week_work_time)])
-    print(make_rule("'", '-'))
+    print(make_rule(table['corner-bottom-left'], table['outer-horizontal'], table['join-bottom'],
+                    table['corner-bottom-right']))
 
 
 def main():
@@ -195,7 +234,12 @@ def main():
         stamps.append(st)
 
     work_days = list(collect(reversed(stamps), now))
-    time_table(work_days, now)
+
+    if cfg['timesheet']['style'] == 'ascii':
+        table = ascii_table
+    else:
+        table = box_table
+    time_table(work_days, now, table)
 
     work_time = timedelta()
     if work_days:

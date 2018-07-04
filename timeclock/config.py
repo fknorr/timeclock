@@ -7,6 +7,9 @@ from os import path
 DEFAULT_CONFIG = {
     'stamps': {
         'dir': path.join(appdirs.user_data_dir('timeclock', roaming=True), 'stamps'),
+    },
+    'timesheet': {
+        'style': 'box',
     }
 }
 
