@@ -265,7 +265,7 @@ def main():
     if hours_worked < hours_required:
         print('{} to go this week.'.format(fmt_hours(hours_required - hours_worked)))
     elif hours_worked > hours_required:
-        print('Made {} overtime this week.'.format(fmt_hours(work_time - hours_required)))
+        print('Made {} overtime this week.'.format(fmt_hours(hours_worked - hours_required)))
     else:
         print('Just on time!')
 
