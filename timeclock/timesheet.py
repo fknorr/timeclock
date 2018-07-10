@@ -29,6 +29,7 @@ ascii_table = {
     'outer-vertical': '|',
     'working-state': '>>',
     'paused-state': '::',
+    'placeholder': '-?-',
 }
 
 
@@ -48,6 +49,7 @@ box_table = {
     'outer-vertical': '\u2502',
     'working-state': '\u25b6',
     'paused-state': '\u23f8',
+    'placeholder': '?',
 }
 
 
@@ -78,7 +80,7 @@ class WorkDay:
         self.state = None
 
     def work_time(self, now: Arrow):
-        if not self.begin:
+        if not self.consistent():
             return timedelta()
         end = self.end if self.end is not None else now
         return (end - self.begin) - self.pause_time
@@ -91,29 +93,29 @@ class WorkDay:
 
     def columns(self, now: Arrow, table: dict):
         cols = []
-        placeholder = '-?-'
 
         if self.begin:
             begin_time = self.begin.to('local')
             cols += [begin_time.format('ddd MMM DD'), begin_time.format('HH:mm')]
         else:
-            cols += [placeholder, placeholder]
+            cols += [table['placeholder']] * 2
 
         if self.end:
             cols.append(self.end.to('local').format('HH:mm'))
+        elif not self.consistent():
+            cols.append(table['placeholder'])
         elif self.state == State.PAUSING:
             cols.append(table['paused-state'])
-        elif self.state == State.WORKING:
-            cols.append(table['working-state'])
         else:
-            cols.append(placeholder)
+            assert self.state == State.WORKING
+            cols.append(table['working-state'])
 
         cols.append(fmt_timedelta(self.pause_time))
 
         if self.consistent():
             cols.append(fmt_timedelta(self.work_time(now)))
         else:
-            cols.append(placeholder)
+            cols.append(table['placeholder'])
 
         return cols
 
@@ -194,20 +196,32 @@ def time_table(work_days: list, now: Arrow, table: dict):
 
     last_week = None
     week_work_time = timedelta()
+    week_time_is_lower_bound = False
+
+    def print_total():
+        week_time_str = fmt_timedelta(week_work_time)
+        if week_time_is_lower_bound:
+            week_time_str = week_time_str[:-2] + '+h'
+
+        print(rule)
+        print_row(['week total', '', '', '', week_time_str])
 
     for day, row in zip(work_days, cells):
         this_week = day.begin.floor('week')
         if last_week is not None and last_week < this_week:
-            print(rule)
-            print_row(['week total', '', '', '', fmt_timedelta(week_work_time)])
+            print_total()
             print(rule)
             week_work_time = timedelta()
+            week_time_is_lower_bound = False
+
         last_week = this_week
         week_work_time += day.work_time(now)
+        if not day.consistent():
+            week_time_is_lower_bound = True
+
         print_row(row)
 
-    print(rule)
-    print_row(['week total', '', '', '', fmt_timedelta(week_work_time)])
+    print_total()
     print(make_rule(table['corner-bottom-left'], table['outer-horizontal'], table['join-bottom'],
                     table['corner-bottom-right']))
 
@@ -270,7 +284,7 @@ def main():
         print('Just on time!')
 
     if any(not d.consistent() for d in work_days):
-        print('The timesheet is inconsistent. Maybe the file system is out of sync?')
+        print('The time sheet is inconsistent. Maybe the file system is out of sync?')
 
     return 0
 
