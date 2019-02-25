@@ -72,6 +72,7 @@ class State(Enum):
 
 class WorkDay:
     def __init__(self):
+        self.date = None
         self.begin = None
         self.end = None
         self.pause_time = timedelta()
@@ -92,13 +93,12 @@ class WorkDay:
         return self.consistent() and self.end is not None and self.state == State.ABSENT
 
     def columns(self, now: Arrow, table: dict):
-        cols = []
+        cols = [self.date.to('local').format('ddd MMM DD')]
 
         if self.begin:
-            begin_time = self.begin.to('local')
-            cols += [begin_time.format('ddd MMM DD'), begin_time.format('HH:mm')]
+            cols.append(self.begin.to('local').format('HH:mm'))
         else:
-            cols += [table['placeholder']] * 2
+            cols.append(table['placeholder'])
 
         if self.end:
             cols.append(self.end.to('local').format('HH:mm'))
@@ -133,6 +133,9 @@ def collect(stamps, now: Arrow):
 
         if stamp.transition != Transition.IN and not stamp.may_follow(last_stamp):
             day.invalid_transitions = True
+
+        if day.date is None:
+            day.date = stamp.time.floor('day')
 
         if stamp.transition == Transition.IN:
             day.begin = stamp.time
@@ -207,7 +210,7 @@ def time_table(work_days: list, now: Arrow, table: dict):
         print_row(['week total', '', '', '', week_time_str])
 
     for day, row in zip(work_days, cells):
-        this_week = day.begin.floor('week')
+        this_week = day.date.floor('week')
         if last_week is not None and last_week < this_week:
             print_total()
             print(rule)
@@ -263,7 +266,7 @@ def main():
     if work_days:
         current_week = now.floor('week')
         for day in reversed(work_days):
-            if day.begin is not None and day.begin.floor('week') != current_week:
+            if day.date.floor('week') != current_week:
                 break
 
             work_time += day.work_time(now)
