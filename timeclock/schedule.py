@@ -44,26 +44,43 @@ class Weekday(IntEnum):
     SUN = 6
 
 
+@unique
+class Category(IntEnum):
+    WORK_DAY = 0
+    VACATION = 1
+    SICK = 2
+    HOLIDAY = 3
+    WEEKEND = 4
+
+    def __str__(self):
+        return self.name.lower().replace('_', '-')
+
+    @classmethod
+    def from_str(cls, s: str):
+        return cls[s.replace('-', '_').upper()]
+
+
 class Schedule:
     def __init__(self):
         self.working_days = list(range(0, 5))
         self.hours_per_week = 40
-        self.holidays = []
+        self.events = []
 
-    def is_work_day(self, day: Arrow):
+    @property
+    def hours_per_day(self):
+        return self.hours_per_week / len(self.working_days)
+
+    def categorize(self, day: Arrow):
         day = day.floor('day')
         if day.weekday() not in self.working_days:
-            return False
-        for date, recurring, _ in self.holidays:
+            return Category.WEEKEND
+        cat = Category.WORK_DAY
+        for date, category, recurring, _ in self.events:
             if (not recurring and day == date) or (recurring and day == date.replace(year=day.year)):
-                return False
-        return True
+                cat = max(cat, category)
+        return cat
 
-    def working_hours_in_week(self, day: Arrow):
-        working_days = sum(1 for d in Arrow.range('day', day.floor('week'), day.ceil('week')) if self.is_work_day(d))
-        return self.hours_per_week / len(self.working_days) * working_days
-
-    def import_holidays(self, file):
+    def import_ical(self, file, category: Category):
         cal = Calendar.from_ical(file.read())
 
         for component in cal.subcomponents:
@@ -86,7 +103,7 @@ class Schedule:
                     else:
                         print('unsupported recurrence ' + freq, file=stderr)
 
-                self.holidays += [(d.date(), recurring, summary) for d in days_in_range(start, end)]
+                self.events += [(d.date(), category, recurring, summary) for d in days_in_range(start, end)]
             except KeyError or IndexError:
                 print('Skipping incomplete vCalendar event', file=stderr)
 
@@ -94,8 +111,8 @@ class Schedule:
         toml.dump({
             'working-days': self.working_days,
             'hours-per-week': self.hours_per_week,
-            'holidays': [
-                {'date': d, 'recurring': r, 'summary': s} for d, r, s in self.holidays
+            'events': [
+                {'date': d, 'category': str(c), 'recurring': r, 'summary': s} for d, c, r, s in self.events
             ],
         }, f)
 
@@ -115,8 +132,8 @@ class Schedule:
             pass
 
         try:
-            for h in d['holidays']:
-                instance.holidays.append((h['date'], h['recurring'], h['summary']))
+            for h in d['events']:
+                instance.events.append((h['date'], Category.from_str(h['category']), h['recurring'], h['summary']))
         except KeyError:
             pass
 
@@ -142,22 +159,20 @@ def main():
     args = parser.parse_args()
     cfg = config.load(args.config)
 
-    schedule = Schedule()
-
     schedule_file = cfg['schedule']['file']
     try:
         with open(schedule_file, 'r') as f:
-            schedule.load(f)
+            schedule = Schedule.load(f)
     except FileNotFoundError:
-        pass
+        schedule = Schedule()
 
     if args.action == Action.IMPORT_HOLIDAYS:
-        with_file(args.file, schedule.import_holidays)
+        with_file(args.file, lambda f: schedule.import_ical(f, Category.HOLIDAY))
         os.makedirs(os.path.dirname(schedule_file), exist_ok=True)
         with open(schedule_file, 'w') as f:
             schedule.write(f)
     else:
-        for entry in Schedule().holidays:
+        for entry in schedule.events:
             print(*entry)
 
 
