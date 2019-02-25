@@ -8,6 +8,9 @@ DEFAULT_CONFIG = {
     'stamps': {
         'dir': path.join(appdirs.user_data_dir('timeclock', roaming=True), 'stamps'),
     },
+    'schedule': {
+        'file': path.join(appdirs.user_data_dir('timeclock', roaming=True), 'schedule.toml'),
+    },
     'timesheet': {
         'style': 'box',
     }
