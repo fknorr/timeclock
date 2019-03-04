@@ -8,49 +8,10 @@ import appdirs
 import arrow
 from arrow import Arrow
 
-from timeclock import config
+from timeclock import config, tablefmt
 from timeclock.stamp import iter_stamps, Stamp, Transition
 from timeclock.schedule import Schedule
-
-
-ascii_table = {
-    'corner-top-left': '.',
-    'corner-top-right': '.',
-    'corner-bottom-left': "'",
-    'corner-bottom-right': "'",
-    'join-mid': '+',
-    'join-top': '-',
-    'join-bottom': '-',
-    'join-left': '|',
-    'join-right': '|',
-    'inner-horizontal': '-',
-    'inner-vertical': '|',
-    'outer-horizontal': '-',
-    'outer-vertical': '|',
-    'working-state': '>>',
-    'paused-state': '::',
-    'placeholder': '-?-',
-}
-
-
-box_table = {
-    'corner-top-left': '\u250c',
-    'corner-top-right': '\u2510',
-    'corner-bottom-left': '\u2514',
-    'corner-bottom-right': '\u2518',
-    'join-mid': '\u253c',
-    'join-top': '\u252c',
-    'join-bottom': '\u2534',
-    'join-left': '\u251c',
-    'join-right': '\u2524',
-    'inner-horizontal': '\u2500',
-    'inner-vertical': '\u2502',
-    'outer-horizontal': '\u2500',
-    'outer-vertical': '\u2502',
-    'working-state': '\u25b6',
-    'paused-state': '\u23f8',
-    'placeholder': '?',
-}
+from timeclock.tablefmt import Table, Column
 
 
 def fmt_hours(hours: float):
@@ -175,27 +136,10 @@ def pad_center(text, width):
     return ' ' * pad_left + text + ' ' * (pad - pad_left)
 
 
-def time_table(work_days: list, now: Arrow, table: dict):
-    head = ['date', 'begin', 'end', 'pause', 'worked']
-    cells = [d.columns(now, table) for d in work_days]
-    column_widths = [max(map(len, c)) for c in zip(*([head] + cells))]
-
-    def make_rule(left: str, dash: str, inner: str, right: str):
-        return dash.join([left, (dash + inner + dash).join(w * dash for w in column_widths), right])
-
-    rule = make_rule(table['join-left'], table['inner-horizontal'], table['join-mid'],
-                     table['join-right'])
-
-    def print_row(cells: [str]):
-        inner = table['inner-vertical']
-        outer = table['outer-vertical']
-        print(outer, (' ' + inner + ' ').join(pad_center(*a) for a in zip(cells, column_widths)),
-                    outer)
-
-    print(make_rule(table['corner-top-left'], table['outer-horizontal'], table['join-top'],
-                    table['corner-top-right']))
-    print_row(head)
-    print(rule)
+def time_table(work_days: list, now: Arrow, style: dict):
+    table = Table([Column.CENTER, Column.CENTER, Column.CENTER, Column.CENTER, Column.CENTER])
+    table.row(['date', 'begin', 'end', 'pause', 'worked'])
+    table.rule()
 
     last_week = None
     week_work_time = timedelta()
@@ -206,14 +150,15 @@ def time_table(work_days: list, now: Arrow, table: dict):
         if week_time_is_lower_bound:
             week_time_str = week_time_str[:-2] + '+h'
 
-        print(rule)
-        print_row(['week total', '', '', '', week_time_str])
+        table.rule()
+        table.row(['week total', '', '', '', week_time_str])
 
+    cells = [d.columns(now, style) for d in work_days]
     for day, row in zip(work_days, cells):
         this_week = day.date.floor('week')
         if last_week is not None and last_week < this_week:
             print_total()
-            print(rule)
+            table.rule()
             week_work_time = timedelta()
             week_time_is_lower_bound = False
 
@@ -222,45 +167,16 @@ def time_table(work_days: list, now: Arrow, table: dict):
         if not day.consistent():
             week_time_is_lower_bound = True
 
-        print_row(row)
+        table.row(row)
 
     print_total()
-    print(make_rule(table['corner-bottom-left'], table['outer-horizontal'], table['join-bottom'],
-                    table['corner-bottom-right']))
+    table.print(style)
 
 
-def main():
-    parser = ArgumentParser(description='Keep track of working hours')
-    parser.add_argument('-c', '--config', metavar='config', type=str,
-                        default=path.join(appdirs.user_config_dir('timeclock', roaming=True),
-                                          'config.toml'))
-    parser.add_argument('-n', '--weeks', type=int, default=1)
-
-    args = parser.parse_args()
-
-    cfg = config.load(args.config)
-    now = arrow.utcnow()
-
-    stamp_dir = path.expanduser(cfg['stamps']['dir'])
-    stamps = []
-    week = 0
-    current_week = now.floor('week')
-    for file in sorted(iter_stamps(stamp_dir), reverse=True):
-        st = Stamp.load(file)
-        if st.time.floor('week') != current_week:
-            week += 1
-            if week >= args.weeks:
-                break
-            current_week = st.time.floor('week')
-        stamps.append(st)
-
+def week_table(style: dict, stamps: [Stamp], now: Arrow):
     work_days = list(collect(reversed(stamps), now))
 
-    if cfg['timesheet']['style'] == 'ascii':
-        table = ascii_table
-    else:
-        table = box_table
-    time_table(work_days, now, table)
+    time_table(work_days, now, style)
 
     work_time = timedelta()
     if work_days:
@@ -288,6 +204,52 @@ def main():
 
     if any(not d.consistent() for d in work_days):
         print('The time sheet is inconsistent. Maybe the file system is out of sync?')
+
+
+def stamp_table(style: dict, stamps: [Stamp]):
+    table = Table([Column.LEFT, Column.LEFT])
+    table.row(['timestamp', 'transition'])
+    table.rule()
+    for stamp in stamps:
+        table.row([stamp.time.to('local').format('ddd MMM DD HH:mm'), stamp.transition])
+    table.print(style)
+
+
+def main():
+    parser = ArgumentParser(description='Keep track of working hours')
+    parser.add_argument('-c', '--config', metavar='config', type=str,
+                        default=path.join(appdirs.user_config_dir('timeclock', roaming=True),
+                                          'config.toml'))
+    parser.add_argument('-n', '--weeks', type=int, default=1)
+    parser.add_argument('--stamps', default=False, action='store_true', help='Show individual stamps')
+
+    args = parser.parse_args()
+
+    cfg = config.load(args.config)
+    now = arrow.utcnow()
+
+    stamp_dir = path.expanduser(cfg['stamps']['dir'])
+    stamps = []
+    week = 0
+    current_week = now.floor('week')
+    for file in sorted(iter_stamps(stamp_dir), reverse=True):
+        st = Stamp.load(file)
+        if st.time.floor('week') != current_week:
+            week += 1
+            if week >= args.weeks:
+                break
+            current_week = st.time.floor('week')
+        stamps.append(st)
+
+    if cfg['timesheet']['style'] == 'ascii':
+        table = tablefmt.ASCII_STYLE
+    else:
+        table = tablefmt.BOX_STYLE
+
+    if args.stamps:
+        stamp_table(table, stamps)
+    else:
+        week_table(table, stamps, now)
 
     return 0
 
