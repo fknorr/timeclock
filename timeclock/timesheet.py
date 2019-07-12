@@ -1,4 +1,3 @@
-from argparse import ArgumentParser
 from datetime import timedelta
 from enum import Enum, unique
 from math import floor
@@ -8,9 +7,9 @@ import appdirs
 import arrow
 from arrow import Arrow
 
-from timeclock import config, tablefmt
-from timeclock.stamp import iter_stamps, Stamp, Transition
+from timeclock import config, tablefmt, utils
 from timeclock.schedule import Schedule
+from timeclock.stamp import iter_stamps, Stamp, Transition
 from timeclock.tablefmt import Table, Column
 
 
@@ -207,38 +206,63 @@ def week_table(style: dict, stamps: [Stamp], now: Arrow):
 
 
 def stamp_table(style: dict, stamps: [Stamp]):
-    table = Table([Column.LEFT, Column.LEFT])
-    table.row(['timestamp', 'transition'])
+    table = Table([Column.LEFT, Column.LEFT, Column.LEFT, Column.LEFT, Column.LEFT])
+    table.row(['date', 'time', 'stamp', 'transition', 'tag'])
     table.rule()
-    for stamp in stamps:
-        table.row([stamp.time.to('local').format('ddd MMM DD HH:mm'), stamp.transition])
+
+    last_day = None
+    first_stamp_today = True
+    for stamp in reversed(stamps):
+        local_time = stamp.time.to('local')
+        day = local_time.floor('day')
+        if last_day is not None and day != last_day:
+            table.rule()
+            first_stamp_today = True
+
+        date = ''
+        if first_stamp_today:
+            date = local_time.format('ddd MMM DD')
+
+        table.row([date, local_time.format('HH:mm'), stamp.time.timestamp, stamp.transition, stamp.details])
+
+        last_day = day
+        first_stamp_today = False
+
     table.print(style)
 
 
-def main():
-    parser = ArgumentParser(description='Keep track of working hours')
-    parser.add_argument('-c', '--config', metavar='config', type=str,
-                        default=path.join(appdirs.user_config_dir('timeclock', roaming=True),
-                                          'config.toml'))
-    parser.add_argument('-n', '--weeks', type=int, default=1)
-    parser.add_argument('--stamps', default=False, action='store_true', help='Show individual stamps')
+class ArgumentParser(utils.ArgumentParser):
+    def __init__(self):
+        super().__init__(description='Keep track of working hours')
+        self.add_argument('-c', '--config', metavar='config', type=str,
+                          default=path.join(appdirs.user_config_dir('timeclock', roaming=True),
+                                            'config.toml'))
+        self.add_argument('--stamps', default=False, action='store_true', help='Show individual stamps')
 
-    args = parser.parse_args()
+        scope = self.add_mutually_exclusive_group()
+        scope.add_argument('-n', '--weeks', type=int)
+        scope.add_argument('--since', type=self._parse_date)
+
+
+def main():
+    args = ArgumentParser().parse_args()
 
     cfg = config.load(args.config)
     now = arrow.utcnow()
 
+    if args.since is not None:
+        since = args.since
+    elif args.weeks is not None:
+        since = (now - timedelta(weeks=args.weeks - 1)).floor('week')
+    else:
+        since = now.floor('week')
+
     stamp_dir = path.expanduser(cfg['stamps']['dir'])
     stamps = []
-    week = 0
-    current_week = now.floor('week')
     for file in sorted(iter_stamps(stamp_dir), reverse=True):
         st = Stamp.load(file)
-        if st.time.floor('week') != current_week:
-            week += 1
-            if week >= args.weeks:
-                break
-            current_week = st.time.floor('week')
+        if st.time < since:
+            break
         stamps.append(st)
 
     if cfg['timesheet']['style'] == 'ascii':

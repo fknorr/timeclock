@@ -1,17 +1,15 @@
-import csv
-import operator
+import os
 from argparse import ArgumentParser
 from enum import unique, Enum, auto, IntEnum
-import os
 from sys import stdin, stderr
 
 import appdirs
-import arrow
 import toml
 from arrow import Arrow
 from icalendar import Calendar, Event
 
-from timeclock import config
+from timeclock import config, tablefmt
+from timeclock.tablefmt import Table, Column
 
 
 @unique
@@ -172,8 +170,19 @@ def main():
         with open(schedule_file, 'w') as f:
             schedule.write(f)
     else:
-        for entry in schedule.events:
-            print(*entry)
+        table = Table([Column.CENTER] * 3 + [Column.LEFT])
+        table.row(['date', 'kind', 'recurring', 'occasion'])
+        table.rule()
+
+        for date, kind, recurring, occasion in schedule.events:
+            table.row([date, kind, 'yes' if recurring else '-', occasion])
+
+        if cfg['timesheet']['style'] == 'ascii':
+            style = tablefmt.ASCII_STYLE
+        else:
+            style = tablefmt.BOX_STYLE
+
+        table.print(style)
 
 
 if __name__ == '__main__':

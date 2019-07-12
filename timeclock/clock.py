@@ -1,16 +1,15 @@
 import sys
 from os import path, makedirs
-import argparse
 
-import arrow
 import appdirs
+import arrow
 
+from timeclock import config, utils
 from timeclock import stamp
 from timeclock.stamp import Transition, Stamp
-from timeclock import config
 
 
-class ArgumentParser(argparse.ArgumentParser):
+class ArgumentParser(utils.ArgumentParser):
     def __init__(self):
         super().__init__(description='Keep track of working hours')
         self.add_argument('transition', type=self._parse_transition,
@@ -27,21 +26,6 @@ class ArgumentParser(argparse.ArgumentParser):
                           help='Modify last stamp')
         self.add_argument('-r', '--remove', default=False, action='store_true',
                           help='Remove latest stamp')
-
-    def _parse_transition(self, transition: str):
-        try:
-            return Transition.from_str(transition)
-        except KeyError:
-            self.error('Unknown transition {}. Allowed values are {}'.format(
-                transition, ' '.join('"{}"'.format(t) for t in Transition)))
-
-    def _parse_date(self, date: str):
-        import dateparser
-        dt = dateparser.parse(date, languages=['en'], settings={'RETURN_AS_TIMEZONE_AWARE': True})
-        if dt is None:
-            self.error('Invalid date format "{}". Try something like "11:40" or "2 hours ago"'
-                       .format(date))
-        return arrow.Arrow.fromdatetime(dt)
 
 
 def main():
