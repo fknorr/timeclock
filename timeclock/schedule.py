@@ -61,12 +61,14 @@ class Category(IntEnum):
 class Schedule:
     def __init__(self):
         self.working_days = list(range(0, 5))
-        self.hours_per_week = 40
+        self.hours_per_week = None
         self.events = []
 
     @property
     def hours_per_day(self):
-        return self.hours_per_week / len(self.working_days)
+        if self.hours_per_week is not None:
+            return self.hours_per_week / len(self.working_days)
+        return None
 
     def categorize(self, day: Arrow):
         day = day.floor('day')

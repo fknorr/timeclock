@@ -172,7 +172,7 @@ def time_table(work_days: list, now: Arrow, style: dict):
     table.print(style)
 
 
-def week_table(style: dict, stamps: [Stamp], now: Arrow):
+def week_table(style: dict, stamps: [Stamp], now: Arrow, schedule: Schedule):
     work_days = list(collect(reversed(stamps), now))
 
     time_table(work_days, now, style)
@@ -186,20 +186,19 @@ def week_table(style: dict, stamps: [Stamp], now: Arrow):
 
             work_time += day.work_time(now)
 
-    schedule = Schedule()
+    if schedule.hours_per_week is not None:
+        hours_worked = work_time.total_seconds() / 3600
+        hours_required = float(schedule.hours_per_week)
+        print('\nWorked {} of {} required ({:.0f}%).'.format(
+            fmt_hours(hours_worked), fmt_hours(hours_required),
+            100 * hours_worked / hours_required), end=' ')
 
-    hours_worked = work_time.total_seconds() / 3600
-    hours_required = float(schedule.hours_per_week)
-    print('\nWorked {} of {} required ({:.0f}%).'.format(
-        fmt_hours(hours_worked), fmt_hours(hours_required), 100 * hours_worked / hours_required),
-        end=' ')
-
-    if hours_worked < hours_required:
-        print('{} to go this week.'.format(fmt_hours(hours_required - hours_worked)))
-    elif hours_worked > hours_required:
-        print('Made {} overtime this week.'.format(fmt_hours(hours_worked - hours_required)))
-    else:
-        print('Just on time!')
+        if hours_worked < hours_required:
+            print('{} to go this week.'.format(fmt_hours(hours_required - hours_worked)))
+        elif hours_worked > hours_required:
+            print('Made {} overtime this week.'.format(fmt_hours(hours_worked - hours_required)))
+        else:
+            print('Just on time!')
 
     if any(not d.consistent() for d in work_days):
         print('The time sheet is inconsistent. Maybe the file system is out of sync?')
@@ -273,7 +272,14 @@ def main():
     if args.stamps:
         stamp_table(table, stamps)
     else:
-        week_table(table, stamps, now)
+        schedule_file = cfg['schedule']['file']
+        try:
+            with open(schedule_file, 'r') as f:
+                schedule = Schedule.load(f)
+        except FileNotFoundError:
+            schedule = Schedule()
+
+        week_table(table, stamps, now, schedule)
 
     return 0
 

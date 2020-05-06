@@ -59,7 +59,7 @@ class Stamp:
         name_part = cls.FILE_NAME_RE.match(path.basename(file_name))
         if not name_part:
             raise ValueError('Invalid stamp file name')
-        time = arrow.get(name_part.group(1))
+        time = arrow.get(int(name_part.group(1)))
 
         with open(file_name, 'r') as file:
             info = cls.STAMP_FILE_RE.match(file.read())
