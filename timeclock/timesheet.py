@@ -77,6 +77,8 @@ class WorkDay:
         else:
             cols.append(table['placeholder'])
 
+        cols.append(', '.join(self.tags))
+
         return cols
 
 
@@ -136,8 +138,9 @@ def pad_center(text, width):
 
 
 def time_table(work_days: list, now: Arrow, style: dict):
-    table = Table([Column.CENTER, Column.CENTER, Column.CENTER, Column.CENTER, Column.CENTER])
-    table.row(['date', 'begin', 'end', 'pause', 'worked'])
+    table = Table([Column.CENTER, Column.CENTER, Column.CENTER, Column.CENTER, Column.CENTER,
+                   Column.LEFT])
+    table.row(['date', 'begin', 'end', 'pause', 'worked', 'tags'])
     table.rule()
 
     last_week = None
@@ -150,7 +153,7 @@ def time_table(work_days: list, now: Arrow, style: dict):
             week_time_str = week_time_str[:-2] + '+h'
 
         table.rule()
-        table.row(['week total', '', '', '', week_time_str])
+        table.row(['week total', '', '', '', week_time_str, ''])
 
     cells = [d.columns(now, style) for d in work_days]
     for day, row in zip(work_days, cells):
