@@ -37,7 +37,7 @@ class Transition(Enum):
 
 class Stamp:
     FILE_NAME_RE = re.compile(r'^(\d+)\.stamp$')
-    STAMP_FILE_RE = re.compile(r'^\s*([A-Za-z]+)\s*:\s*(\S*)\s*$')
+    STAMP_FILE_RE = re.compile(r'^\s*([A-Za-z]+)\s*:\s*(.*?)\s*$')
 
     def __init__(self, transition: Transition, time: Arrow, details: str=''):
         self.transition = transition
