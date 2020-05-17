@@ -25,7 +25,7 @@ class Transition(Enum):
         if self == Transition.IN:
             return other in [Transition.OUT, None]
         elif self in [Transition.OUT, Transition.PAUSE]:
-            return other in [Transition.IN, Transition.RESUME]
+            return other in [Transition.IN, Transition.RESUME, Transition.TAG]
         elif self == Transition.RESUME:
             return other in [Transition.PAUSE]
         elif self == Transition.TAG:
