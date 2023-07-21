@@ -225,7 +225,7 @@ def stamp_table(style: dict, stamps: [Stamp]):
         if first_stamp_today:
             date = local_time.format('ddd MMM DD')
 
-        table.row([date, local_time.format('HH:mm'), stamp.time.timestamp, stamp.transition, stamp.details])
+        table.row([date, local_time.format('HH:mm'), stamp.time.int_timestamp, stamp.transition, stamp.details])
 
         last_day = day
         first_stamp_today = False

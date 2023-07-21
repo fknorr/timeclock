@@ -59,7 +59,7 @@ class Stamp:
         name_part = cls.FILE_NAME_RE.match(path.basename(file_name))
         if not name_part:
             raise ValueError('Invalid stamp file name')
-        time = arrow.get(int(name_part.group(1)))
+        time = Arrow.fromtimestamp(int(name_part.group(1)))
 
         with open(file_name, 'r') as file:
             info = cls.STAMP_FILE_RE.match(file.read())
@@ -73,7 +73,7 @@ class Stamp:
         return cls.FILE_NAME_RE.match(path.basename(file_name)) is not None
 
     def write(self, directory: str):
-        file_name = path.join(directory, '{}.stamp'.format(self.time.timestamp))
+        file_name = path.join(directory, '{}.stamp'.format(self.time.int_timestamp))
         with open(file_name, 'w') as file:
             file.write('{}:{}\n'.format(str(self.transition), self.details))
 
@@ -96,4 +96,4 @@ def most_recent(directory: str):
 
 
 def remove_at(directory: str, time: Arrow):
-    remove(path.join(directory, '{}.stamp'.format(time.timestamp)))
+    remove(path.join(directory, '{}.stamp'.format(time.int_timestamp)))
