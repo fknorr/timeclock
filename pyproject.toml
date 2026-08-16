@@ -1,0 +1,34 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "timeclock"
+dynamic = ["version"]
+description = "Keep track of working hours with simple shell commands"
+readme = "README"
+license = { text = "MIT" }
+authors = [
+    { name = "Fabian Knorr", email = "git@fabian-knorr.info" }
+]
+dependencies = [
+    "icalendar",
+    "toml",
+    "arrow",
+    "appdirs",
+    "dateparser",
+]
+
+[project.urls]
+Homepage = "https://github.com/fknorr/timeclock"
+
+[project.scripts]
+clock = "timeclock.clock:main"
+timesheet = "timeclock.timesheet:main"
+schedule = "timeclock.schedule:main"
+
+[tool.setuptools.dynamic]
+version = { attr = "timeclock.__version__" }
+
+[tool.setuptools.packages.find]
+where = ["."]
